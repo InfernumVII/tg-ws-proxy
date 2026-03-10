@@ -66,6 +66,7 @@ enum MTProtoInitParser {
         let input = Data(repeating: 0, count: length)
         var output = Data(repeating: 0, count: length)
         var moved = 0
+        let outputCount = output.count
 
         let updateStatus = input.withUnsafeBytes { inputBytes in
             output.withUnsafeMutableBytes { outputBytes in
@@ -74,7 +75,7 @@ enum MTProtoInitParser {
                     inputBytes.baseAddress,
                     input.count,
                     outputBytes.baseAddress,
-                    output.count,
+                    outputCount,
                     &moved
                 )
             }
