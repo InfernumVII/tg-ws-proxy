@@ -1,8 +1,9 @@
 name: Build iOS prototype
 
 on:
-  workflow_dispatch:
-
+  push:
+    branches: [ main ]
+    
 jobs:
   build-ios:
     runs-on: macos-15
