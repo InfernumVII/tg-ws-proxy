@@ -1,0 +1,44 @@
+name: Build iOS prototype
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec ios/project.yml
+
+      - name: Build iPhoneOS app without signing
+        run: |
+          xcodebuild \
+            -project ios/TgWsProxyIOS.xcodeproj \
+            -scheme TgWsProxyIOS \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -R build/Build/Products/Release-iphoneos/TgWsProxyIOS.app build/ipa/Payload/
+          cd build/ipa
+          /usr/bin/zip -r TgWsProxyIOS-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TgWsProxyIOS-unsigned
+          path: build/ipa/TgWsProxyIOS-unsigned.ipa
