@@ -216,7 +216,7 @@ private extension NEAppProxyTCPFlow {
     }
 
     func readChunk() async throws -> Data? {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data?, Error>) in
             self.readData(completionHandler: { data, error in
                 if let error {
                     continuation.resume(throwing: error)

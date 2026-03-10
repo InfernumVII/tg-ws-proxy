@@ -172,7 +172,7 @@ actor RawWebSocketClient {
     }
 
     private func sendRaw(_ data: Data) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: data, completion: .contentProcessed { error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -184,7 +184,7 @@ actor RawWebSocketClient {
     }
 
     private func receiveChunk() async throws -> Data? {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data?, Error>) in
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, isComplete, error in
                 if let error {
                     continuation.resume(throwing: error)

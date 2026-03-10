@@ -57,7 +57,7 @@ actor TCPConnectionClient {
             return data
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data?, Error>) in
             connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { data, _, isComplete, error in
                 if let error {
                     continuation.resume(throwing: error)
