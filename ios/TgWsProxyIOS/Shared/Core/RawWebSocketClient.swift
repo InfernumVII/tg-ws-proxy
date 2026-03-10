@@ -48,7 +48,7 @@ actor RawWebSocketClient {
     private let domain: String
 
     func connect() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var resumed = false
             connection.stateUpdateHandler = { state in
                 switch state {

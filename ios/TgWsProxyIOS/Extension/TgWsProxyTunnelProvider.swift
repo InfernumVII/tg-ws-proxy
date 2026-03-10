@@ -196,7 +196,7 @@ private actor TelegramBridgeEngine {
         return prefixes.contains { text.hasPrefix($0) }
     }
 
-    private func close(flow: NEAppProxyTCPFlow, error: Error?) {
+    nonisolated private func close(flow: NEAppProxyTCPFlow, error: Error?) {
         flow.closeReadWithError(error)
         flow.closeWriteWithError(error)
     }
@@ -204,7 +204,7 @@ private actor TelegramBridgeEngine {
 
 private extension NEAppProxyTCPFlow {
     func openIfNeeded() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.open(withLocalEndpoint: nil) { error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -232,7 +232,7 @@ private extension NEAppProxyTCPFlow {
     }
 
     func writeChunk(_ data: Data) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             self.write(data, withCompletionHandler: { error in
                 if let error {
                     continuation.resume(throwing: error)

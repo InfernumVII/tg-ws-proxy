@@ -14,7 +14,7 @@ actor TCPConnectionClient {
     }
 
     func start() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var resumed = false
             connection.stateUpdateHandler = { state in
                 switch state {
@@ -39,7 +39,7 @@ actor TCPConnectionClient {
     }
 
     func send(_ data: Data) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: data, completion: .contentProcessed { error in
                 if let error {
                     continuation.resume(throwing: error)
