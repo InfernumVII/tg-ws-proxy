@@ -110,6 +110,17 @@ pip install pyinstaller
 pyinstaller packaging/windows.spec
 ```
 
+## iOS prototype
+
+В репозитории добавлен черновой нативный iOS-прототип в папке [ios/](ios/):
+
+- SwiftUI-приложение
+- `Network Extension` (`NEAppProxyProvider`)
+- XcodeGen-спека для генерации проекта
+- GitHub Actions workflow для сборки unsigned `.ipa`
+
+Подробности и ограничения описаны в [ios/README.md](ios/README.md).
+
 ## Лицензия
 
 [MIT License](LICENSE)
