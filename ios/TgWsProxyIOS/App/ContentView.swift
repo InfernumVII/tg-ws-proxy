@@ -19,6 +19,13 @@ struct ContentView: View {
                             .textSelection(.enabled)
                             .foregroundStyle(.secondary)
                     }
+
+                    if !model.signingDiagnostics.isEmpty {
+                        Text(model.signingDiagnostics)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("Configuration") {
@@ -59,9 +66,17 @@ struct ContentView: View {
                         if !model.debugMessage.isEmpty {
                             lines.append("debug: \(model.debugMessage)")
                         }
+                        if !model.signingDiagnostics.isEmpty {
+                            lines.append("signing:\n\(model.signingDiagnostics)")
+                        }
                         UIPasteboard.general.string = lines.joined(separator: "\n")
                     }
                     .disabled(model.statusMessage.isEmpty && model.debugMessage.isEmpty)
+
+                    Button("Refresh signing diagnostics") {
+                        model.refreshSigningDiagnostics()
+                    }
+                    .disabled(model.isBusy)
                 }
 
                 Section("Notes") {
