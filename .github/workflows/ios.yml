@@ -31,8 +31,8 @@ jobs:
             exit 1
           fi
 
-            PASSWORD_FILE=$(mktemp)
-            python3 -c "from pathlib import Path; raw = Path('cert/password.txt').read_bytes(); candidates = []; encodings = ('utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be', 'latin-1'); [candidates.append(value) for encoding in encodings for value in [raw.decode(encoding, errors='ignore').replace(chr(0), '').rstrip('\\r\\n')] if value and value not in candidates]; print(*candidates, sep='\\n')" > "$PASSWORD_FILE"
+          PASSWORD_FILE=$(mktemp)
+          python3 -c "from pathlib import Path; raw = Path('cert/password.txt').read_bytes(); candidates = []; encodings = ('utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be', 'latin-1'); [candidates.append(value) for encoding in encodings for value in [raw.decode(encoding, errors='ignore').replace(chr(0), '').rstrip('\\r\\n')] if value and value not in candidates]; print(*candidates, sep='\\n')" > "$PASSWORD_FILE"
 
           if [ ! -s "$PASSWORD_FILE" ]; then
             echo "Unable to decode cert/password.txt into any usable password candidate"
@@ -59,7 +59,17 @@ jobs:
           done < "$PASSWORD_FILE"
 
           if [ "$IMPORT_OK" -ne 1 ]; then
-            echo "Unable to import PKCS#12 certificate. Password candidates from cert/password.txt did not match the .p12 file."
+            if security import "$P12_PATH" \
+              -k build.keychain \
+              -P "" \
+              -T /usr/bin/codesign \
+              -T /usr/bin/security; then
+              IMPORT_OK=1
+            fi
+          fi
+
+          if [ "$IMPORT_OK" -ne 1 ]; then
+            echo "Unable to import PKCS#12 certificate. The .p12 password is incorrect, the file is corrupted, or the certificate was exported with a different password."
             exit 1
           fi
 
