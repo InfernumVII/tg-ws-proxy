@@ -19,7 +19,7 @@ Telegram Desktop → SOCKS5 (127.0.0.1:1080) → TG WS Proxy → WSS (kws*.web.t
 5. Если WS недоступен (302 redirect) — автоматически переключается на прямое TCP-соединение
 
 ## 🚀 Быстрый старт
-
+1
 ### Windows
 Перейдите на [страницу релизов](https://github.com/Flowseal/tg-ws-proxy/releases) и скачайте **`TgWsProxy.exe`**. Он собирается автоматически через [Github Actions](https://github.com/Flowseal/tg-ws-proxy/actions) из открытого исходного кода.
 
