@@ -21,86 +21,6 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate --spec ios/project.yml
 
-      - name: Import signing certificate and provisioning profile
-        run: |
-          P12_PATH=$(find cert -name '*.p12' -print | head -n 1)
-          PROFILE_PATH=$(find cert -name '*.mobileprovision' -print | head -n 1)
-
-          if [ -z "$P12_PATH" ] || [ -z "$PROFILE_PATH" ] || [ ! -f cert/password.txt ]; then
-            echo "Signing assets not found in cert/"
-            exit 1
-          fi
-
-          PASSWORD_FILE=$(mktemp)
-          python3 -c "from pathlib import Path; raw = Path('cert/password.txt').read_bytes(); candidates = []; encodings = ('utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be', 'latin-1'); [candidates.append(value) for encoding in encodings for value in [raw.decode(encoding, errors='ignore').replace(chr(0), '').rstrip('\\r\\n')] if value and value not in candidates]; print(*candidates, sep='\\n')" > "$PASSWORD_FILE"
-
-          if [ ! -s "$PASSWORD_FILE" ]; then
-            echo "Unable to decode cert/password.txt into any usable password candidate"
-            exit 1
-          fi
-
-          KEYCHAIN_PASSWORD=$(uuidgen)
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security list-keychains -d user -s build.keychain login.keychain-db
-
-          IMPORT_OK=0
-          while IFS= read -r PASSWORD; do
-            if security import "$P12_PATH" \
-              -k build.keychain \
-              -P "$PASSWORD" \
-              -T /usr/bin/codesign \
-              -T /usr/bin/security; then
-              IMPORT_OK=1
-              break
-            fi
-          done < "$PASSWORD_FILE"
-
-          if [ "$IMPORT_OK" -ne 1 ]; then
-            if security import "$P12_PATH" \
-              -k build.keychain \
-              -P "" \
-              -T /usr/bin/codesign \
-              -T /usr/bin/security; then
-              IMPORT_OK=1
-            fi
-          fi
-
-          if [ "$IMPORT_OK" -ne 1 ]; then
-            echo "Unable to import PKCS#12 certificate. The .p12 password is incorrect, the file is corrupted, or the certificate was exported with a different password."
-            exit 1
-          fi
-
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s \
-            -k "$KEYCHAIN_PASSWORD" \
-            build.keychain
-
-          PROFILE_PLIST=$(mktemp)
-          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
-          APP_IDENTIFIER=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$PROFILE_PLIST")
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
-
-          SIGNING_IDENTITY=$(security find-identity -v -p codesigning build.keychain | awk -F '"' '/".*"/ { print $2; exit }')
-
-          if [ -z "$SIGNING_IDENTITY" ]; then
-            echo "No codesigning identity found in imported certificate"
-            exit 1
-          fi
-
-          echo "Using provisioning profile: $PROFILE_NAME"
-          echo "Profile application identifier: $APP_IDENTIFIER"
-          /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.networking.networkextension' "$PROFILE_PLIST" || true
-
-          echo "SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
-          echo "PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
-
       - name: Build iPhoneOS app without signing
         run: |
           xcodebuild \
@@ -135,36 +55,16 @@ jobs:
           /usr/bin/plutil -p "$EXT_PATH/Info.plist"
           /usr/bin/plutil -extract NSExtension xml1 -o - "$EXT_PATH/Info.plist"
 
-      - name: Embed provisioning profile and sign app
-        run: |
-          APP_PATH="build/Build/Products/Release-iphoneos/TgWsProxyIOS.app"
-          EXT_PATH="$APP_PATH/PlugIns/TgWsProxyTunnel.appex"
-
-          cp "$PROFILE_PATH" "$APP_PATH/embedded.mobileprovision"
-          cp "$PROFILE_PATH" "$EXT_PATH/embedded.mobileprovision"
-
-          /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" \
-            --entitlements ios/TgWsProxyIOS/Resources/Extension.entitlements \
-            --generate-entitlement-der \
-            "$EXT_PATH"
-
-          /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" \
-            --entitlements ios/TgWsProxyIOS/Resources/App.entitlements \
-            --generate-entitlement-der \
-            "$APP_PATH"
-
-          /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-
       - name: Package IPA
         run: |
           rm -rf build/ipa
           mkdir -p build/ipa/Payload
           /usr/bin/ditto build/Build/Products/Release-iphoneos/TgWsProxyIOS.app build/ipa/Payload/TgWsProxyIOS.app
           cd build/ipa
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload TgWsProxyIOS-signed.ipa
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload TgWsProxyIOS-unsigned.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TgWsProxyIOS-signed
-          path: build/ipa/TgWsProxyIOS-signed.ipa
+          name: TgWsProxyIOS-unsigned
+          path: build/ipa/TgWsProxyIOS-unsigned.ipa
