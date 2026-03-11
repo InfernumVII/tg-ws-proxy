@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @EnvironmentObject private var model: AppModel
@@ -11,6 +12,13 @@ struct ContentView: View {
                     Text(model.statusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
+                    if !model.debugMessage.isEmpty {
+                        Text(model.debugMessage)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("Configuration") {
@@ -45,6 +53,15 @@ struct ContentView: View {
                         }
                     }
                     .disabled(model.isBusy)
+
+                    Button("Copy debug") {
+                        var lines: [String] = ["status: \(model.statusMessage)"]
+                        if !model.debugMessage.isEmpty {
+                            lines.append("debug: \(model.debugMessage)")
+                        }
+                        UIPasteboard.general.string = lines.joined(separator: "\n")
+                    }
+                    .disabled(model.statusMessage.isEmpty && model.debugMessage.isEmpty)
                 }
 
                 Section("Notes") {

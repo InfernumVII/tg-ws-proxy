@@ -6,6 +6,7 @@ final class AppModel: ObservableObject {
     @Published var dcIPText: String = ProxyConfiguration.defaults.dcIP.joined(separator: "\n")
     @Published var verboseLogging = false
     @Published var statusMessage = "Preparing configuration…"
+    @Published var debugMessage = ""
     @Published var isBusy = false
     @Published var isRunning = false
 
@@ -80,8 +81,11 @@ final class AppModel: ObservableObject {
 
             self.manager = manager
             statusMessage = "VPN/App Proxy profile installed. The system may ask for confirmation."
+            debugMessage = managerSummary(manager, stage: "install-success")
         } catch {
-            statusMessage = "Failed to install profile: \(error.localizedDescription)"
+            let details = errorDetails(error)
+            statusMessage = "Failed to install profile: \(details)"
+            debugMessage = managerSummary(manager, stage: "install-failed")
         }
     }
 
@@ -104,8 +108,11 @@ final class AppModel: ObservableObject {
             try manager.connection.startVPNTunnel()
             isRunning = true
             statusMessage = "Tunnel start requested. Check iOS VPN status if it does not connect."
+            debugMessage = managerSummary(manager, stage: "start-requested")
         } catch {
-            statusMessage = "Failed to start tunnel: \(error.localizedDescription)"
+            let details = errorDetails(error)
+            statusMessage = "Failed to start tunnel: \(details)"
+            debugMessage = managerSummary(manager, stage: "start-failed")
         }
     }
 
@@ -119,8 +126,11 @@ final class AppModel: ObservableObject {
         do {
             manager = try await loadExistingManager()
             isRunning = manager?.connection.status == .connected || manager?.connection.status == .connecting
+            debugMessage = managerSummary(manager, stage: "refresh")
         } catch {
-            statusMessage = "Failed to load existing profile: \(error.localizedDescription)"
+            let details = errorDetails(error)
+            statusMessage = "Failed to load existing profile: \(details)"
+            debugMessage = "refresh failed"
         }
     }
 
@@ -172,4 +182,32 @@ final class AppModel: ObservableObject {
             }
         }
     }
+
+    private func errorDetails(_ error: Error) -> String {
+        let nsError = error as NSError
+        var parts: [String] = []
+        parts.append(nsError.localizedDescription)
+        parts.append("domain=\(nsError.domain)")
+        parts.append("code=\(nsError.code)")
+        if let reason = nsError.userInfo[NSLocalizedFailureReasonErrorKey] as? String, !reason.isEmpty {
+            parts.append("reason=\(reason)")
+        }
+        if !nsError.userInfo.isEmpty {
+            parts.append("userInfo=\(nsError.userInfo)")
+        }
+        return parts.joined(separator: " | ")
+    }
+
+    private func managerSummary(_ manager: NETunnelProviderManager?, stage: String) -> String {
+        guard let manager else {
+            return "[\(stage)] manager=nil"
+        }
+
+        let status = manager.connection.status
+        if let proto = manager.protocolConfiguration as? NETunnelProviderProtocol {
+            return "[\(stage)] enabled=\(manager.isEnabled) status=\(status.rawValue) providerBundleId=\(proto.providerBundleIdentifier ?? "nil") serverAddress=\(proto.serverAddress ?? "nil")"
+        }
+        return "[\(stage)] enabled=\(manager.isEnabled) status=\(status.rawValue) protocol=\(String(describing: manager.protocolConfiguration))"
+    }
+
 }
