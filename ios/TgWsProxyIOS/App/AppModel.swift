@@ -1,6 +1,5 @@
 import Foundation
 import NetworkExtension
-import Security
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -226,29 +225,58 @@ final class AppModel: ObservableObject {
     private func buildSigningDiagnostics() -> String {
         var lines: [String] = []
         lines.append("bundle=\(Bundle.main.bundleIdentifier ?? "nil")")
-
-        let appIdentifier = entitlementValue(for: "application-identifier")
-        lines.append("application-identifier=\(appIdentifier)")
-
-        let teamIdentifier = entitlementValue(for: "com.apple.developer.team-identifier")
-        lines.append("team-id=\(teamIdentifier)")
-
-        let ne = entitlementValue(for: "com.apple.developer.networking.networkextension")
-        lines.append("networkextension=\(ne)")
-
-        let getTaskAllow = entitlementValue(for: "get-task-allow")
-        lines.append("get-task-allow=\(getTaskAllow)")
+        lines.append(contentsOf: embeddedProvisioningDiagnostics())
 
         lines.append("expected-provider-bundle-id=\(providerBundleIdentifier)")
         return lines.joined(separator: "\n")
     }
 
-    private func entitlementValue(for key: String) -> String {
-        guard let task = SecTaskCreateFromSelf(nil) else {
-            return "unavailable (SecTaskCreateFromSelf failed)"
+    private func embeddedProvisioningDiagnostics() -> [String] {
+        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+              let data = try? Data(contentsOf: url) else {
+            return ["embedded.mobileprovision=missing"]
         }
-        guard let value = SecTaskCopyValueForEntitlement(task, key as CFString, nil) else {
-            return "missing"
+
+        // .mobileprovision is a CMS envelope that contains an XML plist payload.
+        let raw = String(decoding: data, as: UTF8.self)
+        guard let start = raw.range(of: "<?xml"),
+              let end = raw.range(of: "</plist>") else {
+            return ["embedded.mobileprovision=present (plist payload not found)"]
+        }
+
+        let plistText = String(raw[start.lowerBound..<end.upperBound])
+        guard let plistData = plistText.data(using: .utf8),
+              let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any] else {
+            return ["embedded.mobileprovision=present (plist parse failed)"]
+        }
+
+        var out: [String] = []
+        out.append("embedded.mobileprovision=present")
+
+        if let profileName = plist["Name"] as? String {
+            out.append("profile-name=\(profileName)")
+        }
+
+        if let teamIds = plist["TeamIdentifier"] as? [String], !teamIds.isEmpty {
+            out.append("profile-team-id=\(teamIds.joined(separator: ","))")
+        }
+
+        if let ent = plist["Entitlements"] as? [String: Any] {
+            out.append("application-identifier=\(stringify(ent["application-identifier"]))")
+            out.append("team-id=\(stringify(ent["com.apple.developer.team-identifier"]))")
+            out.append("networkextension=\(stringify(ent["com.apple.developer.networking.networkextension"]))")
+            out.append("get-task-allow=\(stringify(ent["get-task-allow"]))")
+        } else {
+            out.append("entitlements=missing")
+        }
+
+        return out
+    }
+
+    private func stringify(_ value: Any?) -> String {
+        guard let value else { return "missing" }
+        if let strings = value as? [String] {
+            return "[\(strings.joined(separator: ","))]"
         }
         return String(describing: value)
     }
