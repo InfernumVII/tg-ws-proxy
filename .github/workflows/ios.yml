@@ -31,12 +31,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
+      - name: Verify built app extension metadata
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/TgWsProxyIOS.app"
+          EXT_PATH="$APP_PATH/PlugIns/TgWsProxyTunnel.appex"
+
+          test -d "$APP_PATH"
+          test -d "$EXT_PATH"
+          test -f "$EXT_PATH/Info.plist"
+
+          /usr/bin/plutil -p "$EXT_PATH/Info.plist"
+          /usr/bin/plutil -extract NSExtension xml1 -o - "$EXT_PATH/Info.plist"
+
       - name: Package IPA
         run: |
+          rm -rf build/ipa
           mkdir -p build/ipa/Payload
-          cp -R build/Build/Products/Release-iphoneos/TgWsProxyIOS.app build/ipa/Payload/
+          /usr/bin/ditto build/Build/Products/Release-iphoneos/TgWsProxyIOS.app build/ipa/Payload/TgWsProxyIOS.app
           cd build/ipa
-          /usr/bin/zip -r TgWsProxyIOS-unsigned.ipa Payload
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload TgWsProxyIOS-unsigned.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
