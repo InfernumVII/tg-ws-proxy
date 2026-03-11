@@ -1,5 +1,6 @@
 import Foundation
 import NetworkExtension
+import Security
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -7,6 +8,7 @@ final class AppModel: ObservableObject {
     @Published var verboseLogging = false
     @Published var statusMessage = "Preparing configuration…"
     @Published var debugMessage = ""
+    @Published var signingDiagnostics = ""
     @Published var isBusy = false
     @Published var isRunning = false
 
@@ -42,6 +44,7 @@ final class AppModel: ObservableObject {
         }
         verboseLogging = defaults.bool(forKey: "verboseLogging")
         await refreshManager()
+        refreshSigningDiagnostics()
         statusMessage = "Edit the mapping, install the profile, then start the tunnel."
     }
 
@@ -82,10 +85,12 @@ final class AppModel: ObservableObject {
             self.manager = manager
             statusMessage = "VPN/App Proxy profile installed. The system may ask for confirmation."
             debugMessage = managerSummary(manager, stage: "install-success")
+            refreshSigningDiagnostics()
         } catch {
             let details = errorDetails(error)
             statusMessage = "Failed to install profile: \(details)"
             debugMessage = managerSummary(manager, stage: "install-failed")
+            refreshSigningDiagnostics()
         }
     }
 
@@ -109,10 +114,12 @@ final class AppModel: ObservableObject {
             isRunning = true
             statusMessage = "Tunnel start requested. Check iOS VPN status if it does not connect."
             debugMessage = managerSummary(manager, stage: "start-requested")
+            refreshSigningDiagnostics()
         } catch {
             let details = errorDetails(error)
             statusMessage = "Failed to start tunnel: \(details)"
             debugMessage = managerSummary(manager, stage: "start-failed")
+            refreshSigningDiagnostics()
         }
     }
 
@@ -127,11 +134,17 @@ final class AppModel: ObservableObject {
             manager = try await loadExistingManager()
             isRunning = manager?.connection.status == .connected || manager?.connection.status == .connecting
             debugMessage = managerSummary(manager, stage: "refresh")
+            refreshSigningDiagnostics()
         } catch {
             let details = errorDetails(error)
             statusMessage = "Failed to load existing profile: \(details)"
             debugMessage = "refresh failed"
+            refreshSigningDiagnostics()
         }
+    }
+
+    func refreshSigningDiagnostics() {
+        signingDiagnostics = buildSigningDiagnostics()
     }
 
     private func parseCurrentConfiguration() -> ProxyConfiguration? {
@@ -208,6 +221,36 @@ final class AppModel: ObservableObject {
             return "[\(stage)] enabled=\(manager.isEnabled) status=\(status.rawValue) providerBundleId=\(proto.providerBundleIdentifier ?? "nil") serverAddress=\(proto.serverAddress ?? "nil")"
         }
         return "[\(stage)] enabled=\(manager.isEnabled) status=\(status.rawValue) protocol=\(String(describing: manager.protocolConfiguration))"
+    }
+
+    private func buildSigningDiagnostics() -> String {
+        var lines: [String] = []
+        lines.append("bundle=\(Bundle.main.bundleIdentifier ?? "nil")")
+
+        let appIdentifier = entitlementValue(for: "application-identifier")
+        lines.append("application-identifier=\(appIdentifier)")
+
+        let teamIdentifier = entitlementValue(for: "com.apple.developer.team-identifier")
+        lines.append("team-id=\(teamIdentifier)")
+
+        let ne = entitlementValue(for: "com.apple.developer.networking.networkextension")
+        lines.append("networkextension=\(ne)")
+
+        let getTaskAllow = entitlementValue(for: "get-task-allow")
+        lines.append("get-task-allow=\(getTaskAllow)")
+
+        lines.append("expected-provider-bundle-id=\(providerBundleIdentifier)")
+        return lines.joined(separator: "\n")
+    }
+
+    private func entitlementValue(for key: String) -> String {
+        guard let task = SecTaskCreateFromSelf(nil) else {
+            return "unavailable (SecTaskCreateFromSelf failed)"
+        }
+        guard let value = SecTaskCopyValueForEntitlement(task, key as CFString, nil) else {
+            return "missing"
+        }
+        return String(describing: value)
     }
 
 }
