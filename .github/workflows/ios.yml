@@ -33,22 +33,22 @@ jobs:
 
           PASSWORD_FILE=$(mktemp)
           python3 - <<'PY' > "$PASSWORD_FILE"
-from pathlib import Path
+            from pathlib import Path
 
-raw = Path('cert/password.txt').read_bytes()
-candidates = []
-for encoding in ('utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be', 'latin-1'):
-    try:
-        value = raw.decode(encoding)
-    except Exception:
-        continue
-    value = value.replace('\x00', '').rstrip('\r\n')
-    if value and value not in candidates:
-        candidates.append(value)
+            raw = Path('cert/password.txt').read_bytes()
+            candidates = []
+            for encoding in ('utf-8-sig', 'utf-16', 'utf-16le', 'utf-16be', 'latin-1'):
+              try:
+                value = raw.decode(encoding)
+              except Exception:
+                continue
+              value = value.replace('\x00', '').rstrip('\r\n')
+              if value and value not in candidates:
+                candidates.append(value)
 
-for item in candidates:
-    print(item)
-PY
+            for item in candidates:
+              print(item)
+            PY
 
           if [ ! -s "$PASSWORD_FILE" ]; then
             echo "Unable to decode cert/password.txt into any usable password candidate"
