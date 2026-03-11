@@ -31,6 +31,17 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
+      - name: Repair app extension Info.plist metadata
+        run: |
+          EXT_PLIST="build/Build/Products/Release-iphoneos/TgWsProxyIOS.app/PlugIns/TgWsProxyTunnel.appex/Info.plist"
+          test -f "$EXT_PLIST"
+
+          if ! /usr/bin/plutil -extract NSExtension xml1 -o - "$EXT_PLIST" >/dev/null 2>&1; then
+            /usr/libexec/PlistBuddy -c "Add :NSExtension dict" "$EXT_PLIST"
+            /usr/libexec/PlistBuddy -c "Add :NSExtension:NSExtensionPointIdentifier string com.apple.networkextension.app-proxy" "$EXT_PLIST"
+            /usr/libexec/PlistBuddy -c "Add :NSExtension:NSExtensionPrincipalClass string TgWsProxyTunnel.TgWsProxyTunnelProvider" "$EXT_PLIST"
+          fi
+
       - name: Verify built app extension metadata
         run: |
           APP_PATH="build/Build/Products/Release-iphoneos/TgWsProxyIOS.app"
